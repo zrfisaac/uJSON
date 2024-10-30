@@ -16,10 +16,36 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-  Autor : Jose Fabio Nascimento de Almeida
-  Data : 7/11/2005
-
 }
+(*
+
+  @abstract( Contém todas as classes para manipular o formato JSON. )
+
+  As principais classes são :  TJSONObject,  TJSONArray .
+
+  OBS: A unit uJSON foi adaptada de uma implementação para json em Java ver
+  http://www.json.org .
+
+  JSON =  JavaScript Object Notation
+
+  @author(Jose Fabio Nascimento de Almeida, <fabiorecife@gmail.com>)
+  @created(november 7, 2005)
+
+  Utilizando:@br
+    para criar um objeto json a partir da string:
+    
+    @code(
+    s  := '{"Commands":[{"Command":"NomeComando", params:{param1:1}}]}' ;@br
+    json := TJSONObject.create (s);
+    )
+    
+    para acessar os elementos:@br
+    @code(json.getJSONArray ('Commands) // retorna uma TJSONArray dos comandos)
+
+    para retornar a string  "NomeComando":@br
+    @code(json.getJSONArray ('Commands).getJSONObject(0).getString('Command'))
+
+*)
 unit uJSON;
 
 interface
@@ -27,33 +53,67 @@ uses
   Windows,SysUtils, Classes,  TypInfo;
 
 Type
+    { @abstract(Classe pai de todas as classes em uJSON , resolve o problema de
+      impedância entre a classe java Object e a classe delphi TObject)
+    }
     TZAbstractObject = class
+      { retorna true se value é igual ao objeto}
       function equals(const Value: TZAbstractObject): Boolean; virtual;
+      { código hash do objeto , usa-se o endereço de memória}
       function hash: LongInt;
+      { clona o objeto
+       @return ( um TZAbstractObject )}
       function Clone: TZAbstractObject; virtual;
+      {retorna a representação com string do objeto
+       @return (uma string)}
       function toString: string; virtual;
+      {retorna true se o parâmetro Value é uma instância de TZAbstractObject }
       function instanceOf(const Value: TZAbstractObject): Boolean;
     end;
-    
+
+    { @abstract(wrapper para ClassCastException do java) }
     ClassCastException = class (Exception) end;
+    { @abstract(wrapper para NoSuchElementException do java) }
     NoSuchElementException = class (Exception) end;
+    { @abstract(wrapper para NumberFormatException do java) }
     NumberFormatException = class (Exception) end;
+    { @abstract(wrapper para NullPointerException do java) }
     NullPointerException = class (Exception) end;
+    { @abstract(as features não implementadas geram esta exception) }
     NotImplmentedFeature = class (Exception) end;
-    JSONArray = class ;
+    TJSONArray = class ;
     _Number =  class ;
     _String = class;
     _Double = class;
     NULL = class ;
 
-
+    { @abstract(exception gerada quando ocorre um erro de parsing) }
     ParseException = class (Exception)
        constructor create (_message : string ; index : integer);
     end;
+
+    (**
+      @abstract(Responsável por auxiliar na análise Léxica de uma string que representa um JSON.)
+    *)
     JSONTokener = class  (TZAbstractObject)
      public
+       (**
+        Construct a JSONTokener from a string.
+        @param(s A source string.)     *)
        constructor create (s: string) ;
+
+       (**
+        Back up one character. This provides a sort of lookahead capability,
+        so that you can test for a digit or letter before attempting to parse
+        the next number or identifier.
+       *)
        procedure back();
+       (**
+        Get the hex value of a character (base16).
+        @param(c A character between '0' and '9' or between 'A' and 'F' or
+        between 'a' and 'f'.)
+        @return(An int between 0 and 15, or -1 if c was not a hex digit.)
+       *)
        class function dehexchar(c : char) :integer;
        function more :boolean;
        function next() : char; overload ;
@@ -74,37 +134,118 @@ Type
       mySource : string;
     end;
 
-
-  JSONObject = class (TZAbstractObject)
+  { @abstract(Classe que representa um objeto JSON) }
+  TJSONObject = class (TZAbstractObject)
   private
     myHashMap : TStringList;
   public
+    (**
+      Construct an empty TJSONObject.
+    *)
     constructor create;  overload;
-    constructor create  (jo : JSONObject; sa : array of string); overload;
+
+    (**
+      Construct a TJSONObject from a subset of another TJSONObject.
+      An array of strings is used to identify the keys that should be copied.
+      Missing keys are ignored.
+      @param(jo A TJSONObject.)
+      @param(sa An array of strings).
+     *)
+    constructor create  (jo : TJSONObject; sa : array of string); overload;
+    (**
+      Construct a TJSONObject from a JSONTokener.
+      @param(x A JSONTokener object containing the source string.)
+      @raises(ParseException if there is a syntax error in the source string.)
+    *)
     constructor create (x : JSONTokener); overload;
+    (**
+      Construct a TJSONObject from a TStringList.
+      @param(map A map object that can be used to initialize the contents of
+       the TJSONObject.)
+     *)
     constructor create (map : TStringList); overload;
+    (**
+     Construct a TJSONObject from a string.
+     This is the most commonly used TJSONObject constructor.
+     @param(s @html(A string beginning
+     with <code>{</code>&nbsp;<small>(left brace)</small> and ending
+     with <code>}</code>&nbsp;<small>(right brace)</small>.))
+     @raises(ParseException The string must be properly formatted.)
+    *)
     constructor create (s : string); overload;
 
+    (**
+       remove todos os menbros de um objeto JSON  .
+    *)
     procedure clean;
+    (**
+      sobreescreve o metodo clone de  TZAbstractObject
+    *)
     function clone : TZAbstractObject; override;
-    function accumulate (key : string; value : TZAbstractObject): JSONObject;
+    function accumulate (key : string; value : TZAbstractObject): TJSONObject;
     function get (key : string) : TZAbstractObject;
     function getBoolean (key : string): boolean;
     function getDouble (key : string): double;
     function getInt (key : string): integer;
-    function getJSONArray (key : string) :JSONArray;
-    function getJSONObject (key : string) : JSONObject;
+    function getJSONArray (key : string) :TJSONArray;
+    function getJSONObject (key : string) : TJSONObject;
     function getString (key : string): string;
     function has (key : string) : boolean;
     function isNull (key : string) : boolean;
+    (**
+      retorna um TStringList com todos os nomes dos atributos do TJSONObject
+    *)
     function keys : TStringList ;
+    (**
+      Retorna quantos atributos tem o TJSONObject
+    *)
     function length : integer;
-    function names : JSONArray;
+    (**
+     Produce a TJSONArray containing the names of the elements of this
+     TJSONObject.
+     @return(A TJSONArray containing the key strings, or null if the TJSONObject
+     is empty).
+    *)
+    function names : TJSONArray;
+    (**
+       transforma uma class wrapper _Number (Number em java) em AnsiString
+    *)
     class function numberToString (n: _Number): string;
+    (**
+      Make JSON string of an object value.
+      @html(<p>
+      Warning: This method assumes that the data structure is acyclical.
+      )
+      @param(value The value to be serialized.)
+      @return( @html(a printable, displayable, transmittable
+       representation of the object, beginning
+       with <code>{</code>&nbsp;<small>(left brace)</small> and ending
+       with <code>}</code>&nbsp;<small>(right brace)</small>.))
+     *)
     class function valueToString(value : TZAbstractObject) : string; overload;
+    (**
+      Make a prettyprinted JSON text of an object value.
+      @html(
+      <p>
+      Warning: This method assumes that the data structure is acyclical.
+      )
+      @param(value The value to be serialized.)
+      @param(indentFactor The number of spaces to add to each level of
+       indentation.)
+      @param(indent The indentation of the top level.)
+      @return(@html(a printable, displayable, transmittable
+       representation of the object, beginning
+       with <code>{</code>&nbsp;<small>(left brace)</small> and ending
+       with <code>}</code>&nbsp;<small>(right brace)</small>.))
+     *)
     class function valueToString(value : TZAbstractObject; indentFactor
     , indent : integer) : string; overload;
-
+    (**
+      Get an optional value associated with a key.
+      @param(key   A key string.)
+      @return(An object which is the value, or null if there is no value.)
+      @raises(NullPointerException caso key = '')
+    *)
     function opt (key : string) : TZAbstractObject;
     function optBoolean (key : string): boolean; overload;
     function optBoolean (key : string; defaultValue : boolean): boolean; overload;
@@ -115,21 +256,41 @@ Type
     function optString (key : string): string; overload;
     function optString (key : string; defaultValue : string): string; overload;
 
-    function optJSONArray (key : string): JSONArray; overload;
-    function optJSONObject (key : string): JSONObject; overload;
+    function optJSONArray (key : string): TJSONArray; overload;
+    function optJSONObject (key : string): TJSONObject; overload;
 
-    function put (key : string; value : boolean): JSONObject; overload;
-    function put (key : string; value : double): JSONObject; overload;
-    function put (key : string; value : integer): JSONObject; overload;
-    function put (key : string; value : string): JSONObject; overload;
-    function put (key : string; value : TZAbstractObject): JSONObject; overload;
+    function put (key : string; value : boolean): TJSONObject; overload;
+    function put (key : string; value : double): TJSONObject; overload;
+    function put (key : string; value : integer): TJSONObject; overload;
+    function put (key : string; value : string): TJSONObject; overload;
 
-    function putOpt (key : string; value : TZAbstractObject): JSONObject;
+    (**
+      Put a key/value pair in the TJSONObject. If the value is null,
+      then the key will be removed from the TJSONObject if it is present.
+      @param(key   A key string.)
+      @param(value An object which is the value. It should be of one of these
+       types: Boolean, Double, Integer, TJSONArray, TJSONObject, String, or the
+       TJSONObject.NULL object.)
+      @return(this.)
+      @raises(NullPointerException The key must be non-null.)
+    *)
+    function put (key : string; value : TZAbstractObject): TJSONObject; overload;
+    (**
+      Put a key/value pair in the TJSONObject, but only if the
+      value is non-null.
+      @param(key   A key string.)
+      @param(value An object which is the value. It should be of one of these
+       types: Boolean, Double, Integer, TJSONArray, TJSONObject, String, or the
+       TJSONObject.NULL object.)
+      @return(this.)
+      @raises(NullPointerException The key must be non-null.)
+    *)
+    function putOpt (key : string; value : TZAbstractObject): TJSONObject;
     class function quote (s : string): string;
     function remove (key : string): TZAbstractObject;
-    procedure assignTo(json: JSONObject);
+    procedure assignTo(json: TJSONObject);
 
-    function toJSONArray (names : JSONArray) : JSONArray;
+    function toJSONArray (names : TJSONArray) : TJSONArray;
     function toString (): string ;  overload; override;
     function toString (indentFactor : integer): string; overload;
     function toString (indentFactor, indent : integer): string; overload;
@@ -138,7 +299,8 @@ Type
     class function NULL : NULL;
   end;
 
-  JSONArray = class (TZAbstractObject)
+  { @abstract(Trata um array JSON = [...])}
+  TJSONArray = class (TZAbstractObject)
   public
     destructor destroy ; override;
     constructor create ; overload;
@@ -149,8 +311,14 @@ Type
     function getBoolean (index : integer) : boolean;
     function getDouble (index : integer) : double;
     function getInt (index : integer): integer;
-    function getJSONArray (index : integer) : JSONArray;
-    function getJSONObject (index : integer) : JSONObject;
+    {
+      Get the TJSONArray associated with an index.
+      @param(index The index must be between 0 and length() - 1.)
+      @return(A TJSONArray value.)
+      @raises(NoSuchElementException if the index is not found or if the
+      value is not a TJSONArray)     }
+    function getJSONArray (index : integer) : TJSONArray;
+    function getJSONObject (index : integer) : TJSONObject;
     function getString (index : integer) : string;
     function isNull (index : integer): boolean;
     function join (separator : string) : string;
@@ -162,21 +330,21 @@ Type
     function optDouble (index : integer; defaultValue :double ) : double ; overload;
     function optInt (index : integer) : integer; overload;
     function optInt (index : integer; defaultValue : integer) : integer; overload;
-    function optJSONArray (index : integer) : JSONArray ; overload;
-    function optJSONObject (index : integer) : JSONObject ; overload;
+    function optJSONArray (index : integer) : TJSONArray ; overload;
+    function optJSONObject (index : integer) : TJSONObject ; overload;
     function optString (index : integer) : string; overload;
     function optString (index : integer; defaultValue : string) : string; overload;
-    function put ( value : boolean) : JSONArray; overload ;
-    function put ( value : double ) : JSONArray;   overload ;
-    function put ( value : integer) : JSONArray;   overload ;
-    function put ( value : TZAbstractObject) : JSONArray;  overload ;
-    function put ( value: string): JSONArray; overload;
-    function put ( index : integer ; value : boolean): JSONArray;  overload ;
-    function put ( index : integer ; value : double) : JSONArray;  overload ;
-    function put ( index : integer ; value : integer) : JSONArray;  overload ;
-    function put ( index : integer ; value : TZAbstractObject) : JSONArray;  overload ;
-    function put ( index: integer; value: string): JSONArray; overload;
-    function toJSONObject (names  :JSONArray ) : JSONObject ;  overload ;
+    function put ( value : boolean) : TJSONArray; overload ;
+    function put ( value : double ) : TJSONArray;   overload ;
+    function put ( value : integer) : TJSONArray;   overload ;
+    function put ( value : TZAbstractObject) : TJSONArray;  overload ;
+    function put ( value: string): TJSONArray; overload;
+    function put ( index : integer ; value : boolean): TJSONArray;  overload ;
+    function put ( index : integer ; value : double) : TJSONArray;  overload ;
+    function put ( index : integer ; value : integer) : TJSONArray;  overload ;
+    function put ( index : integer ; value : TZAbstractObject) : TJSONArray;  overload ;
+    function put ( index: integer; value: string): TJSONArray; overload;
+    function toJSONObject (names  :TJSONArray ) : TJSONObject ;  overload ;
     function toString : string; overload; override;
     function toString (indentFactor : integer) : string; overload;
     function toString (indentFactor, indent : integer) : string; overload;
@@ -185,12 +353,13 @@ Type
     myArrayList : TList;
   end;
 
-
+  (** @abstract(wrapper da classe Number do java) *)
   _Number =  class (TZAbstractObject)
      function doubleValue : double; virtual; abstract;
      function intValue : integer; virtual; abstract;
   end;
 
+  (** @abstract(wrapper da classe Boolean do java) *)
   _Boolean = class (TZAbstractObject)
     class function _TRUE () : _Boolean;
     class function _FALSE () : _Boolean;
@@ -202,6 +371,7 @@ Type
     fvalue : boolean;
   end;
 
+  (** @abstract(wrapper da classe Double do java) *)
   _Double = class (_Number)
      constructor create (s : string); overload;
      constructor create (s : _String); overload;
@@ -215,7 +385,7 @@ Type
     fvalue : double;
   end;
 
-
+  (** @abstract(wrapper da classe Integer do java) *)
   _Integer = class (_Number)
     class function parseInt (s : string; i : integer): integer; overload;
     class function parseInt (s : _String): integer; overload;
@@ -230,6 +400,7 @@ Type
     fvalue : integer;
   end;
 
+  (** @abstract(wrapper da classe String do java) *)
   _String = class (TZAbstractObject)
    constructor create (s : string);
    function equalsIgnoreCase (s: string) : boolean;
@@ -240,6 +411,8 @@ Type
      fvalue : string;
   end;
 
+
+  (** @abstract(utilizado quando se deseja representar um valor NULL ) *)
   NULL = class (TZAbstractObject)
      function Equals(const Value: TZAbstractObject): Boolean; override;
      function toString() : string; override;
@@ -247,7 +420,7 @@ Type
 
 
 var
-  gcLista : TList;
+  (** constante para representar um objeto null *)
   CNULL : NULL;
 
 implementation
@@ -309,11 +482,7 @@ end;
 
 { JSONTokener }
 
-(**
-     * Construct a JSONTokener from a string.
-     *
-     * @param s     A source string.
-     *)
+
 constructor JSONTokener.create(s: string);
 begin
   self.myIndex := 1;
@@ -321,11 +490,7 @@ begin
 end;
 
 
-(**
-     * Back up one character. This provides a sort of lookahead capability,
-     * so that you can test for a digit or letter before attempting to parse
-     * the next number or identifier.
-*)
+
 procedure JSONTokener.back;
 begin
   if (self.myIndex > 1) then begin
@@ -334,12 +499,7 @@ begin
 end;
 
 
-(**
-     * Get the hex value of a character (base16).
-     * @param c A character between '0' and '9' or between 'A' and 'F' or
-     * between 'a' and 'f'.
-     * @return  An int between 0 and 15, or -1 if c was not a hex digit.
-     *)
+
 class function JSONTokener.dehexchar(c: char): integer;
 begin
   if ((c >= '0') and (c <= '9')) then begin
@@ -401,9 +561,9 @@ end;
      *
      * @param n     The number of characters to take.
      * @return      A string of n characters.
-     * @exception ParseException
+     * @raises (ParseException
      *   Substring bounds error if there are not
-     *   n characters remaining in the source string.
+     *   n characters remaining in the source string.)
      *)
 function JSONTokener.next(n: integer): string;
 var
@@ -479,7 +639,7 @@ end;
      *      <code>"</code>&nbsp;<small>(double quote)</small> or
      *      <code>'</code>&nbsp;<small>(single quote)</small>.
      * @return      A String.
-     * @exception ParseException Unterminated string.
+     * @raises (ParseException Unterminated string.)
      *)
 function JSONTokener.nextString (quote : char): string;
 var
@@ -507,6 +667,8 @@ begin
                     sb := sb + #12;
                 'r':
                     sb := sb + #13;
+                'u':
+                  sb := sb+WideChar(StrToInt('$'+next(4)));
                 {case 'u':
                     sb.append((char)Integer.parseInt(next(4), 16));
                     break;
@@ -583,8 +745,8 @@ end;
 
 (**
      * Get the next value. The value can be a Boolean, Double, Integer,
-     * JSONArray, JSONObject, or String, or the JSONObject.NULL object.
-     * @exception ParseException The source does not conform to JSON syntax.
+     * TJSONArray, TJSONObject, or String, or the TJSONObject.NULL object.
+     * @raises (ParseException The source does not conform to JSON syntax.)
      *
      * @return An object.
 *)
@@ -602,12 +764,12 @@ begin
             end;
             '{': begin
                 back();
-                result := JSONObject.create(self);
+                result := TJSONObject.create(self);
                 exit;
             end;
             '[': begin
                 back();
-                result := JSONArray.create(self);
+                result := TJSONArray.create(self);
                 exit;
             end;
         end;
@@ -647,7 +809,7 @@ begin
             exit;
         end;
         if (AnsiLowerCase (s) = 'null') then begin
-            result := JSONObject.NULL;
+            result := TJSONObject.NULL;
             exit;
         end;
 
@@ -809,28 +971,20 @@ begin
         result := b ;
 end;
 
-{ JSONObject }
+{ TJSONObject }
 
 
 
 
-(**
-* Construct an empty JSONObject.
-*)
-constructor JSONObject.create;
+
+constructor TJSONObject.create;
 begin
   myHashMap := TStringList.create;
 end;
 
 
-(**
-     * Construct a JSONObject from a subset of another JSONObject.
-     * An array of strings is used to identify the keys that should be copied.
-     * Missing keys are ignored.
-     * @param jo A JSONObject.
-     * @param sa An array of strings.
-     *)
-constructor JSONObject.create(jo: JSONObject; sa: array of string);
+
+constructor TJSONObject.create(jo: TJSONObject; sa: array of string);
 var
  i : integer;
 begin
@@ -840,12 +994,8 @@ begin
   end;
 end;
 
-(**
-     * Construct a JSONObject from a JSONTokener.
-     * @param x A JSONTokener object containing the source string.
-     * @throws ParseException if there is a syntax error in the source string.
-     *)
-constructor JSONObject.create(x: JSONTokener);
+
+constructor TJSONObject.create(x: JSONTokener);
 var
  c : char;
  key : string;
@@ -855,13 +1005,13 @@ begin
   key := '';
 
   if (x.nextClean() <> '{') then begin
-      raise x.syntaxError('A JSONObject must begin with "{"');
+      raise x.syntaxError('A TJSONObject must begin with "{"');
   end;
   while (true) do begin
       c := x.nextClean();
       case (c) of
       #0:
-          raise x.syntaxError('A JSONObject must end with "}"');
+          raise x.syntaxError('A TJSONObject must end with "}"');
       '}': begin
           exit;
       end
@@ -907,12 +1057,8 @@ begin
 
 end;
 
-(**
-     * Construct a JSONObject from a Map.
-     * @param map A map object that can be used to initialize the contents of
-     *  the JSONObject.
-     *)
-constructor JSONObject.create(map: TStringList);
+
+constructor TJSONObject.create(map: TStringList);
 var
  i : integer;
 begin
@@ -922,15 +1068,8 @@ begin
   end;
 end;
 
-(**
-     * Construct a JSONObject from a string.
-     * This is the most commonly used JSONObject constructor.
-     * @param string    A string beginning
-     *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-     *  with <code>}</code>&nbsp;<small>(right brace)</small>.
-     * @exception ParseException The string must be properly formatted.
-     *)
-constructor JSONObject.create(s: string);
+
+constructor TJSONObject.create(s: string);
 var
   token : JSOnTokener;
 begin
@@ -943,28 +1082,28 @@ end;
 (**
      * Accumulate values under a key. It is similar to the put method except
      * that if there is already an object stored under the key then a
-     * JSONArray is stored under the key to hold all of the accumulated values.
-     * If there is already a JSONArray, then the new value is appended to it.
+     * TJSONArray is stored under the key to hold all of the accumulated values.
+     * If there is already a TJSONArray, then the new value is appended to it.
      * In contrast, the put method replaces the previous value.
      * @param key   A key string.
      * @param value An object to be accumulated under the key.
      * @return this.
      * @throws NullPointerException if the key is null
      *)
-function JSONObject.accumulate(key: string; value: TZAbstractObject): JSONObject;
+function TJSONObject.accumulate(key: string; value: TZAbstractObject): TJSONObject;
 var
- a : JSONArray;
+ a : TJSONArray;
  o : TZAbstractObject;
 begin
   a := nil;
   o := opt(key);
   if (o = nil) then begin
       put(key, value);
-  end else if (o is JSONArray) then begin
-      a := JSONArray(o);
+  end else if (o is TJSONArray) then begin
+      a := TJSONArray(o);
       a.put(value);
   end else  begin
-      a := JSONArray.create;
+      a := TJSONArray.create;
       a.put(o.clone);
       a.put(value);
       put(key, a);
@@ -978,15 +1117,15 @@ end;
      *
      * @param key   A key string.
      * @return      The object associated with the key.
-     * @exception NoSuchElementException if the key is not found.
+     * @raises (NoSuchElementException if the key is not found.)
      *)
-function JSONObject.get(key: string): TZAbstractObject;
+function TJSONObject.get(key: string): TZAbstractObject;
 var
  o : TZAbstractObject;
 begin
   o := opt(key);
   if (o = nil) then begin
-      raise NoSuchElementException.create('JSONObject[' +
+      raise NoSuchElementException.create('TJSONObject[' +
           quote(key) + '] not found.');
   end;
   result := o;
@@ -998,11 +1137,11 @@ end;
      *
      * @param key   A key string.
      * @return      The truth.
-     * @exception NoSuchElementException if the key is not found.
-     * @exception ClassCastException
-     *  if the value is not a Boolean or the String "true" or "false".
+     * @raises (NoSuchElementException if the key is not found.)
+     * @raises (ClassCastException
+     *  if the value is not a Boolean or the String "true" or "false".)
      *)
-function JSONObject.getBoolean(key: string): boolean;
+function TJSONObject.getBoolean(key: string): boolean;
 var
  o : TZAbstractObject;
 begin
@@ -1018,11 +1157,11 @@ begin
         result := true;
         exit;
     end;
-    raise ClassCastException.create('JSONObject[' +
+    raise ClassCastException.create('TJSONObject[' +
         quote(key) + '] is not a Boolean.');
 end;
 
-function JSONObject.getDouble(key: string): double;
+function TJSONObject.getDouble(key: string): double;
 var
   o : TZAbstractObject;
 begin
@@ -1035,7 +1174,7 @@ begin
             result := StrToFloat (_String(o).toString(), getFormatSettings());
             exit;
         end;
-        raise NumberFormatException.create('JSONObject[' +
+        raise NumberFormatException.create('TJSONObject[' +
             quote(key) + '] is not a number.');
 end;
 
@@ -1045,11 +1184,11 @@ end;
      *
      * @param key   A key string.
      * @return      The integer value.
-     * @exception NoSuchElementException if the key is not found
-     * @exception NumberFormatException
-     *  if the value cannot be converted to a number.
+     * @raises (NoSuchElementException if the key is not found)
+     * @raises (NumberFormatException
+     *  if the value cannot be converted to a number.)
      *)
-function JSONObject.getInt(key: string): integer;
+function TJSONObject.getInt(key: string): integer;
 var
   o : TZAbstractObject;
 begin
@@ -1064,45 +1203,45 @@ end;
 
 
 (**
-     * Get the JSONArray value associated with a key.
+     * Get the TJSONArray value associated with a key.
      *
      * @param key   A key string.
-     * @return      A JSONArray which is the value.
-     * @exception NoSuchElementException if the key is not found or
-     *  if the value is not a JSONArray.
+     * @return      A TJSONArray which is the value.
+     * @raises (NoSuchElementException if the key is not found or
+     *  if the value is not a TJSONArray.)
      *)
-function JSONObject.getJSONArray(key: string): JSONArray;
+function TJSONObject.getJSONArray(key: string): TJSONArray;
 var
  o : TZAbstractObject;
 begin
-  o := get(key);
-  if (o is JSONArray) then begin
-      result := JSONArray(o);
+  o := opt(key);
+  if (o is TJSONArray) then begin
+      result := TJSONArray(o);
   end else begin
-    raise  NoSuchElementException.create('JSONObject[' +
-        quote(key) + '] is not a JSONArray.');
+    raise  NoSuchElementException.create('TJSONObject[' +
+        quote(key) + '] is not a TJSONArray.');
   end;
 end;
 
 
 (**
-     * Get the JSONObject value associated with a key.
+     * Get the TJSONObject value associated with a key.
      *
      * @param key   A key string.
-     * @return      A JSONObject which is the value.
-     * @exception NoSuchElementException if the key is not found or
-     *  if the value is not a JSONObject.
+     * @return      A TJSONObject which is the value.
+     * @raises (NoSuchElementException if the key is not found or
+     *  if the value is not a TJSONObject.)
      *)
-function JSONObject.getJSONObject(key: string): JSONObject;
+function TJSONObject.getJSONObject(key: string): TJSONObject;
 var
  o : TZAbstractObject;
 begin
   o := get(key);
-  if (o is JSONObject) then begin
-      result := JSONObject(o);
+  if (o is TJSONObject) then begin
+      result := TJSONObject(o);
   end else begin
-    raise NoSuchElementException.create('JSONObject[' +
-        quote(key) + '] is not a JSONObject.');
+    raise NoSuchElementException.create('TJSONObject[' +
+        quote(key) + '] is not a TJSONObject.');
   end;
 end;
 
@@ -1112,20 +1251,20 @@ end;
      *
      * @param key   A key string.
      * @return      A string which is the value.
-     * @exception NoSuchElementException if the key is not found.
+     * @raises (NoSuchElementException if the key is not found.)
 *)
-function JSONObject.getString(key: string): string;
+function TJSONObject.getString(key: string): string;
 begin
   result := get(key).toString();
 end;
 
 
 (**
-     * Determine if the JSONObject contains a specific key.
+     * Determine if the TJSONObject contains a specific key.
      * @param key   A key string.
-     * @return      true if the key exists in the JSONObject.
+     * @return      true if the key exists in the TJSONObject.
      *)
-function JSONObject.has(key: string): boolean;
+function TJSONObject.has(key: string): boolean;
 begin
    result := self.myHashMap.IndexOf(key) >= 0;
 end;
@@ -1136,14 +1275,14 @@ end;
      *  no value.
      * @param key   A key string.
      * @return      true if there is no value associated with the key or if
-     *  the value is the JSONObject.NULL object.
+     *  the value is the TJSONObject.NULL object.
      *)
-function JSONObject.isNull(key: string): boolean;
+function TJSONObject.isNull(key: string): boolean;
 begin
    result := NULL.equals(opt(key));
 end;
 
-function JSONObject.keys: TStringList;
+function TJSONObject.keys: TStringList;
 var
  i : integer;
 begin
@@ -1153,25 +1292,25 @@ begin
   end;
 end;
 
-function JSONObject.length: integer;
+function TJSONObject.length: integer;
 begin
    result := myHashMap.Count;
 end;
 
 
 (**
-     * Produce a JSONArray containing the names of the elements of this
-     * JSONObject.
-     * @return A JSONArray containing the key strings, or null if the JSONObject
+     * Produce a TJSONArray containing the names of the elements of this
+     * TJSONObject.
+     * @return A TJSONArray containing the key strings, or null if the TJSONObject
      * is empty.
      *)
-function JSONObject.names: JSONArray;
+function TJSONObject.names: TJSONArray;
 var
-  ja :JSONArray;
+  ja :TJSONArray;
   i : integer;
   k : TStringList;
 begin
-    ja := JSONArray.create;
+    ja := TJSONArray.create;
     k := keys;
     try
       for i := 0 to k.Count -1 do begin
@@ -1187,7 +1326,7 @@ begin
     end;
 end;
 
-class function JSONObject.numberToString(n: _Number): string;
+class function TJSONObject.numberToString(n: _Number): string;
 begin
    if (n = nil) then begin
      result := '';
@@ -1199,13 +1338,8 @@ begin
 end;
 
 
-(**
-     * Get an optional value associated with a key.
-     * @param key   A key string.
-     * @return      An object which is the value, or null if there is no value.
-     * @exception NullPointerException  The key must not be null.
-     *)
-function JSONObject.opt(key: string): TZAbstractObject;
+
+function TJSONObject.opt(key: string): TZAbstractObject;
 begin
    if (key = '') then begin
             raise NullPointerException.create('Null key');
@@ -1227,7 +1361,7 @@ end;
      * @param key   A key string.
      * @return      The truth.
      *)
-function JSONObject.optBoolean(key: string): boolean;
+function TJSONObject.optBoolean(key: string): boolean;
 begin
   result := optBoolean (key, false);
 end;
@@ -1242,7 +1376,7 @@ end;
      * @param defaultValue     The default.
      * @return      The truth.
      *)
-function JSONObject.optBoolean(key: string;
+function TJSONObject.optBoolean(key: string;
   defaultValue: boolean): boolean;
 var
   o : TZAbstractObject;
@@ -1274,7 +1408,7 @@ end;
      * @param key   A string which is the key.
      * @return      An object which is the value.
      *)
-function JSONObject.optDouble(key: string): double;
+function TJSONObject.optDouble(key: string): double;
 begin
   result := optDouble(key, _Double.NaN);
 end;
@@ -1290,7 +1424,7 @@ end;
      * @param defaultValue     The default.
      * @return      An object which is the value.
      *)
-function JSONObject.optDouble(key: string; defaultValue: double): double;
+function TJSONObject.optDouble(key: string; defaultValue: double): double;
 var
  o : TZAbstractObject;
 begin
@@ -1321,7 +1455,7 @@ end;
      * @param key   A key string.
      * @return      An object which is the value.
      *)
-function JSONObject.optInt(key: string): integer;
+function TJSONObject.optInt(key: string): integer;
 begin
   result := optInt (key, 0);
 end;
@@ -1337,7 +1471,7 @@ end;
      * @param defaultValue     The default.
      * @return      An object which is the value.
      *)
-function JSONObject.optInt(key: string; defaultValue: integer): integer;
+function TJSONObject.optInt(key: string; defaultValue: integer): integer;
 var
   o : TZAbstractObject;
 begin
@@ -1349,6 +1483,7 @@ begin
       end;
       try
           result := _Integer.parseInt(_String(o));
+          exit;
         except on e:Exception  do begin
           result := defaultValue;
           exit;
@@ -1362,20 +1497,20 @@ end;
 
 
 (**
-     * Get an optional JSONArray associated with a key.
+     * Get an optional TJSONArray associated with a key.
      * It returns null if there is no such key, or if its value is not a
-     * JSONArray.
+     * TJSONArray.
      *
      * @param key   A key string.
-     * @return      A JSONArray which is the value.
+     * @return      A TJSONArray which is the value.
      *)
-function JSONObject.optJSONArray(key: string): JSONArray;
+function TJSONObject.optJSONArray(key: string): TJSONArray;
 var
  o : TZAbstractObject ;
 begin
     o := opt(key);
-    if (o is JSONArray) then begin
-      result := JSONArray(o);
+    if (o is TJSONArray) then begin
+      result := TJSONArray(o);
     end else begin
       result := nil;
     end;
@@ -1383,20 +1518,20 @@ end;
 
 
 (**
-     * Get an optional JSONObject associated with a key.
+     * Get an optional TJSONObject associated with a key.
      * It returns null if there is no such key, or if its value is not a
-     * JSONObject.
+     * TJSONObject.
      *
      * @param key   A key string.
-     * @return      A JSONObject which is the value.
+     * @return      A TJSONObject which is the value.
      *)
-function JSONObject.optJSONObject(key: string): JSONObject;
+function TJSONObject.optJSONObject(key: string): TJSONObject;
 var
  o : TZAbstractObject ;
 begin
   o := opt(key);
-  if (o is JSONObject) then begin
-      result := JSONObject(o);
+  if (o is TJSONObject) then begin
+      result := TJSONObject(o);
     end else begin
       result := nil;
     end;
@@ -1410,7 +1545,7 @@ end;
      * @param key   A key string.
      * @return      A string which is the value.
      *)
-function JSONObject.optString(key: string): string;
+function TJSONObject.optString(key: string): string;
 begin
   result := optString(key, '');
 end;
@@ -1423,7 +1558,7 @@ end;
      * @param defaultValue     The default.
      * @return      A string which is the value.
      *)
-function JSONObject.optString(key, defaultValue: string): string;
+function TJSONObject.optString(key, defaultValue: string): string;
 var
  o : TZAbstractObject ;
 begin
@@ -1436,26 +1571,26 @@ begin
 end;
 
 (**
-     * Put a key/boolean pair in the JSONObject.
+     * Put a key/boolean pair in the TJSONObject.
      *
      * @param key   A key string.
      * @param value A boolean which is the value.
      * @return this.
      *)
-function JSONObject.put(key: string; value: boolean): JSONObject;
+function TJSONObject.put(key: string; value: boolean): TJSONObject;
 begin
    put(key, _Boolean.valueOf(value));
    result := self;
 end;
 
 (**
-     * Put a key/double pair in the JSONObject.
+     * Put a key/double pair in the TJSONObject.
      *
      * @param key   A key string.
      * @param value A double which is the value.
      * @return this.
      *)
-function JSONObject.put(key: string; value: double): JSONObject;
+function TJSONObject.put(key: string; value: double): TJSONObject;
 begin
    put(key, _Double.create(value));
    result := self;
@@ -1463,13 +1598,13 @@ end;
 
 
 (**
-     * Put a key/int pair in the JSONObject.
+     * Put a key/int pair in the TJSONObject.
      *
      * @param key   A key string.
      * @param value An int which is the value.
      * @return this.
      *)
-function JSONObject.put(key: string; value: integer): JSONObject;
+function TJSONObject.put(key: string; value: integer): TJSONObject;
 begin
    put(key, _Integer.create(value));
    result := self;
@@ -1477,16 +1612,16 @@ end;
 
 
 (**
-     * Put a key/value pair in the JSONObject. If the value is null,
-     * then the key will be removed from the JSONObject if it is present.
+     * Put a key/value pair in the TJSONObject. If the value is null,
+     * then the key will be removed from the TJSONObject if it is present.
      * @param key   A key string.
      * @param value An object which is the value. It should be of one of these
-     *  types: Boolean, Double, Integer, JSONArray, JSONObject, String, or the
-     *  JSONObject.NULL object.
+     *  types: Boolean, Double, Integer, TJSONArray, TJSONObject, String, or the
+     *  TJSONObject.NULL object.
      * @return this.
-     * @exception NullPointerException The key must be non-null.
+     * @raises (NullPointerException The key must be non-null.)
      *)
-function JSONObject.put(key: string; value: TZAbstractObject): JSONObject;
+function TJSONObject.put(key: string; value: TZAbstractObject): TJSONObject;
 var
   temp : TObject;
   i : integer;
@@ -1512,26 +1647,16 @@ begin
     result := self;
 end;
 
-function JSONObject.put(key, value: string): JSONObject;
+function TJSONObject.put(key, value: string): TJSONObject;
 begin
    put(key, _String.create(value));
    result := self;
 end;
-(**
-     * Put a key/value pair in the JSONObject, but only if the
-     * value is non-null.
-     * @param key   A key string.
-     * @param value An object which is the value. It should be of one of these
-     *  types: Boolean, Double, Integer, JSONArray, JSONObject, String, or the
-     *  JSONObject.NULL object.
-     * @return this.
-     * @exception NullPointerException The key must be non-null.
-     *)
-function JSONObject.putOpt(key: string; value: TZAbstractObject): JSONObject;
+function TJSONObject.putOpt(key: string; value: TZAbstractObject): TJSONObject;
 begin
    if (value <> nil) then begin
     put(key, value);
-   end;
+   end ;
    result := self;
 end;
 
@@ -1542,7 +1667,7 @@ end;
      * @param string A String
      * @return  A String correctly formatted for insertion in a JSON message.
      *)
-class function JSONObject.quote(s: string): string;
+class function TJSONObject.quote(s: string): string;
 var
    b,c : char;
    i, len : integer;
@@ -1597,7 +1722,7 @@ end;
      * @return The value that was associated with the name,
      * or null if there was no value.
      *)
-function JSONObject.remove(key: string): TZAbstractObject;
+function TJSONObject.remove(key: string): TZAbstractObject;
 begin
   if ( myHashMap.IndexOf(key) < 0) then begin
     result := nil
@@ -1608,22 +1733,22 @@ begin
 end;
 
 (**
-     * Produce a JSONArray containing the values of the members of this
-     * JSONObject.
-     * @param names A JSONArray containing a list of key strings. This
+     * Produce a TJSONArray containing the values of the members of this
+     * TJSONObject.
+     * @param names A TJSONArray containing a list of key strings. This
      * determines the sequence of the values in the result.
-     * @return A JSONArray of values.
+     * @return A TJSONArray of values.
      *)
-function JSONObject.toJSONArray(names: JSONArray): JSONArray;
+function TJSONObject.toJSONArray(names: TJSONArray): TJSONArray;
 var
  i : integer;
- ja : JSONArray ;
+ ja : TJSONArray ;
 begin
   if ((names = nil) or (names.length() = 0)) then begin
       result := nil;
       exit;
   end;
-   ja := JSONArray.create;
+   ja := TJSONArray.create;
   for i := 0 to names.length -1 {; i < names.length(); i += 1)} do begin
       ja.put(self.opt(names.getString(i)));
   end;
@@ -1632,7 +1757,7 @@ end;
 
 
 (**
-     * Make an JSON external form string of this JSONObject. For compactness, no
+     * Make an JSON external form string of this TJSONObject. For compactness, no
      * unnecessary whitespace is added.
      * <p>
      * Warning: This method assumes that the data structure is acyclical.
@@ -1642,7 +1767,7 @@ end;
      *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
      *  with <code>}</code>&nbsp;<small>(right brace)</small>.
      *)
-function JSONObject.toString: string;
+function TJSONObject.toString: string;
 var
  _keys : TStringList;
  sb : string;
@@ -1671,7 +1796,7 @@ end;
 
 
 (**
-     * Make a prettyprinted JSON external form string of this JSONObject.
+     * Make a prettyprinted JSON external form string of this TJSONObject.
      * <p>
      * Warning: This method assumes that the data structure is acyclical.
      * @param indentFactor The number of spaces to add to each level of
@@ -1681,13 +1806,13 @@ end;
      *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
      *  with <code>}</code>&nbsp;<small>(right brace)</small>.
      *)
-function JSONObject.toString(indentFactor: integer): string;
+function TJSONObject.toString(indentFactor: integer): string;
 begin
   result := toString(indentFactor, 0);
 end;
 
 (**
-     * Make a prettyprinted JSON string of this JSONObject.
+     * Make a prettyprinted JSON string of this TJSONObject.
      * <p>
      * Warning: This method assumes that the data structure is acyclical.
      * @param indentFactor The number of spaces to add to each level of
@@ -1698,7 +1823,7 @@ end;
      *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
      *  with <code>}</code>&nbsp;<small>(right brace)</small>.
      *)
-function JSONObject.toString(indentFactor, indent: integer): string;
+function TJSONObject.toString(indentFactor, indent: integer): string;
 var
  j , i , n , newindent: integer;
  _keys : TStringList;
@@ -1748,22 +1873,13 @@ begin
         result :=  sb;
 end;
 
-class function JSONObject.NULL: NULL;
+class function TJSONObject.NULL: NULL;
 begin
   result := CNULL;
 end;
 
-(**
-     * Make JSON string of an object value.
-     * <p>
-     * Warning: This method assumes that the data structure is acyclical.
-     * @param value The value to be serialized.
-     * @return a printable, displayable, transmittable
-     *  representation of the object, beginning
-     *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-     *  with <code>}</code>&nbsp;<small>(right brace)</small>.
-     *)
-class function JSONObject.valueToString(value: TZAbstractObject): string;
+
+class function TJSONObject.valueToString(value: TZAbstractObject): string;
 begin
   if ((value = nil) or (value.equals(null))) then begin
       result := 'null';
@@ -1773,8 +1889,8 @@ begin
       result := numberToString(_Number(value));
       exit;
   end;
-  if ((value is _Boolean) or (value is JSONObject) or
-          (value is JSONArray)) then begin
+  if ((value is _Boolean) or (value is TJSONObject) or
+          (value is TJSONArray)) then begin
       result := value.toString();
       exit;
   end;
@@ -1795,7 +1911,7 @@ end;
      *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
      *  with <code>}</code>&nbsp;<small>(right brace)</small>.
      *)
-class function JSONObject.valueToString(value: TZAbstractObject;
+class function TJSONObject.valueToString(value: TZAbstractObject;
   indentFactor, indent: integer): string;
 begin
    if ((value = nil) or (value.equals(nil))) then begin
@@ -1810,12 +1926,12 @@ begin
         result :=  value.toString();
         exit;
     end;
-    if (value is JSONObject) then begin
-        result := ((JSONObject(value)).toString(indentFactor, indent));
+    if (value is TJSONObject) then begin
+        result := ((TJSONObject(value)).toString(indentFactor, indent));
         exit;
     end;
-    if (value is JSONArray) then begin
-        result := ((JSONArray(value)).toString(indentFactor, indent));
+    if (value is TJSONArray) then begin
+        result := ((TJSONArray(value)).toString(indentFactor, indent));
         exit;
     end;
     result := quote(value.toString());
@@ -2005,19 +2121,19 @@ begin
   result := floatToStr (fvalue, getFormatSettings);
 end;
 
-{ JSONArray }
+{ TJSONArray }
 
 (**
-     * Construct a JSONArray from a JSONTokener.
+     * Construct a TJSONArray from a JSONTokener.
      * @param x A JSONTokener
-     * @exception ParseException A JSONArray must start with '['
-     * @exception ParseException Expected a ',' or ']'
+     * @raises (ParseException A TJSONArray must start with '[')
+     * @raises (ParseException Expected a ',' or ']')
      *)
-constructor JSONArray.create(x: JSONTokener);
+constructor TJSONArray.create(x: JSONTokener);
 begin
   create;
   if (x.nextClean() <> '[') then begin
-      raise x.syntaxError('A JSONArray must start with "["');
+      raise x.syntaxError('A TJSONArray must start with "["');
   end;
   if (x.nextClean() = ']') then begin
       exit;
@@ -2047,28 +2163,18 @@ begin
   end;
 end;
 
-destructor JSONObject.destroy;
-var
- i :integer;
+destructor TJSONObject.destroy;
 begin
-    while myHashMap.Count > 0 do begin
-      if (myHashMap.Objects [0] <> CONST_FALSE)
-        and (myHashMap.Objects [0] <> CONST_TRUE)
-        and (myHashMap.Objects [0] <> CNULL) then begin
-        myHashMap.Objects [0].Free;
-      end;
-      myHashMap.Objects [0] := nil;
-      myHashMap.Delete(0);
-    end;
+  clean;
   myHashMap.Free;
   inherited;
 end;
 
 (**
-     * Construct a JSONArray from a Collection.
+     * Construct a TJSONArray from a Collection.
      * @param collection     A Collection.
      *)
-constructor JSONArray.create(collection: TList);
+constructor TJSONArray.create(collection: TList);
 var
   i : integer;
 begin
@@ -2079,27 +2185,27 @@ begin
 end;
 
 (**
- * Construct an empty JSONArray.
+ * Construct an empty TJSONArray.
 *)
-constructor JSONArray.create;
+constructor TJSONArray.create;
 begin
    myArrayList := TList.create;
 end;
 
 
 (**
-     * Construct a JSONArray from a source string.
+     * Construct a TJSONArray from a source string.
      * @param string     A string that begins with
      * <code>[</code>&nbsp;<small>(left bracket)</small>
      *  and ends with <code>]</code>&nbsp;<small>(right bracket)</small>.
-     *  @exception ParseException The string must conform to JSON syntax.
+     *  @raises (ParseException The string must conform to JSON syntax.)
      *)
-constructor JSONArray.create(s: string);
+constructor TJSONArray.create(s: string);
 begin
   create (JSONTokener.create(s));
 end;
 
-destructor JSONArray.destroy;
+destructor TJSONArray.destroy;
 var
  i : integer;
  obj : TObject;
@@ -2124,15 +2230,15 @@ end;
      * @param index
      *  The index must be between 0 and length() - 1.
      * @return An object value.
-     * @exception NoSuchElementException
+     * @raises (NoSuchElementException)
      *)
-function JSONArray.get(index: integer): TZAbstractObject;
+function TJSONArray.get(index: integer): TZAbstractObject;
 var
   o : TZAbstractObject;
 begin
   o := opt(index);
   if (o = nil) then begin
-      raise NoSuchElementException.create('JSONArray[' + intToStr(index)
+      raise NoSuchElementException.create('TJSONArray[' + intToStr(index)
         + '] not found.');
   end ;
   result := o;
@@ -2145,10 +2251,10 @@ end;
      *
      * @param index The index must be between 0 and length() - 1.
      * @return      The truth.
-     * @exception NoSuchElementException if the index is not found
-     * @exception ClassCastException
+     * @raises (NoSuchElementException if the index is not found)
+     * @raises (ClassCastException)
      *)
-function JSONArray.getBoolean(index: integer): boolean;
+function TJSONArray.getBoolean(index: integer): boolean;
 var
   o : TZAbstractObject;
 begin
@@ -2164,7 +2270,7 @@ begin
       result := true;
       exit;
   end;
-  raise ClassCastException.create('JSONArray[' + intToStr(index) +
+  raise ClassCastException.create('TJSONArray[' + intToStr(index) +
       '] not a Boolean.');
 end;
 
@@ -2173,11 +2279,11 @@ end;
      *
      * @param index The index must be between 0 and length() - 1.
      * @return      The value.
-     * @exception NoSuchElementException if the key is not found
-     * @exception NumberFormatException
-     *  if the value cannot be converted to a number.
+     * @raises (NoSuchElementException if the key is not found)
+     * @raises (NumberFormatException
+     *  if the value cannot be converted to a number.)
      *)
-function JSONArray.getDouble(index: integer): double;
+function TJSONArray.getDouble(index: integer): double;
 var
   o : TZAbstractObject;
   d : _Double;
@@ -2196,7 +2302,7 @@ begin
        d.Free;
       end; 
   end;
-  raise NumberFormatException.create('JSONObject['
+  raise NumberFormatException.create('TJSONObject['
      + intToStr(index) + '] is not a number.');
 end;
 
@@ -2206,11 +2312,11 @@ end;
      *
      * @param index The index must be between 0 and length() - 1.
      * @return      The value.
-     * @exception NoSuchElementException if the key is not found
-     * @exception NumberFormatException
-     *  if the value cannot be converted to a number.
+     * @raises (NoSuchElementException if the key is not found)
+     * @raises (NumberFormatException
+     *  if the value cannot be converted to a number.)
      *)
-function JSONArray.getInt(index: integer): integer;
+function TJSONArray.getInt(index: integer): integer;
 var
   o : TZAbstractObject;
 begin
@@ -2223,50 +2329,49 @@ begin
 end;
 
 
-(**
-     * Get the JSONArray associated with an index.
+{
+     * Get the TJSONArray associated with an index.
      * @param index The index must be between 0 and length() - 1.
-     * @return      A JSONArray value.
-     * @exception NoSuchElementException if the index is not found or if the
-     * value is not a JSONArray
-     *)
-function JSONArray.getJSONArray(index: integer): JSONArray;
+     * @return      A TJSONArray value.
+     * @raises (NoSuchElementException if the index is not found or if the
+     * value is not a TJSONArray)     }
+function TJSONArray.getJSONArray(index: integer): TJSONArray;
 var
  o : TZAbstractObject;
 begin
   o := get(index);
-  if (o is JSONArray) then begin
-      result := JSONArray(o);
+  if (o is TJSONArray) then begin
+      result := TJSONArray(o);
       exit;
   end;
-  raise NoSuchElementException.create('JSONArray[' + intToStr(index) +
-          '] is not a JSONArray.');
+  raise NoSuchElementException.create('TJSONArray[' + intToStr(index) +
+          '] is not a TJSONArray.');
 end;
 
 
 (**
-     * Get the JSONObject associated with an index.
+     * Get the TJSONObject associated with an index.
      * @param index subscript
-     * @return      A JSONObject value.
-     * @exception NoSuchElementException if the index is not found or if the
-     * value is not a JSONObject
+     * @return      A TJSONObject value.
+     * @raises (NoSuchElementException if the index is not found or if the
+     * value is not a TJSONObject)
      *)
-function JSONArray.getJSONObject(index: integer): JSONObject;
+function TJSONArray.getJSONObject(index: integer): TJSONObject;
 var
   o : TZAbstractObject;
   s : string;
 begin
   o := get(index);
-  if (o is JSONObject) then begin
-      result := JSONObject(o);
+  if (o is TJSONObject) then begin
+      result := TJSONObject(o);
   end else begin
       if o <> nil then begin
         s := o.ClassName;
       end else begin
         s := 'nil';
       end;
-      raise NoSuchElementException.create('JSONArray[' + intToStr(index) +
-        '] is not a JSONObject is ' + s);
+      raise NoSuchElementException.create('TJSONArray[' + intToStr(index) +
+        '] is not a TJSONObject is ' + s);
   end;
 end;
 
@@ -2274,9 +2379,9 @@ end;
      * Get the string associated with an index.
      * @param index The index must be between 0 and length() - 1.
      * @return      A string value.
-     * @exception NoSuchElementException
+     * @raises (NoSuchElementException)
      *)
-function JSONArray.getString(index: integer): string;
+function TJSONArray.getString(index: integer): string;
 begin
   result := get(index).toString();
 end;
@@ -2287,7 +2392,7 @@ end;
  * @return true if the value at the index is null, or if there is no value.
  *)
 
-function JSONArray.isNull(index: integer): boolean;
+function TJSONArray.isNull(index: integer): boolean;
 var
  o : TZAbstractObject;
 begin
@@ -2296,16 +2401,16 @@ begin
 end;
 
 (**
- * Make a string from the contents of this JSONArray. The separator string
+ * Make a string from the contents of this TJSONArray. The separator string
  * is inserted between each element.
  * Warning: This method assumes that the data structure is acyclical.
  * @param separator A string that will be inserted between the elements.
  * @return a string.
  *)
-function JSONArray.join(separator: string): string;
+function TJSONArray.join(separator: string): string;
 var
   len, i : integer;
-  sb : string ;
+  sb, s : string ;
 begin
 		len := length();
     sb := '';
@@ -2313,28 +2418,29 @@ begin
         if (i > 0) then begin
             sb := sb + separator;
         end;
-        sb:= sb + JSONObject.valueToString(TZAbstractObject( myArrayList[i]));
+        s := TJSONObject.valueToString(TZAbstractObject( myArrayList[i]));
+        sb:= sb + s;
     end;
     result := sb;
 end;
 
 (**
- * Get the length of the JSONArray.
+ * Get the length of the TJSONArray.
  *
  * @return The length (or size).
  *)
-function JSONArray.length: integer;
+function TJSONArray.length: integer;
 begin
   result := myArrayList.Count ;
 end;
 
- (**
-     * Get the optional object value associated with an index.
-     * @param index The index must be between 0 and length() - 1.
-     * @return      An object value, or null if there is no
-     *              object at that index.
-     *)
-function JSONArray.opt(index: integer): TZAbstractObject;
+ {
+      Get the optional object value associated with an index.
+      @param index The index must be between 0 and length() - 1.
+      @return      An object value, or null if there is no
+                   object at that index.
+     }
+function TJSONArray.opt(index: integer): TZAbstractObject;
 begin
     if ((index < 0) or (index >= length()) ) then begin
        result := nil;
@@ -2351,7 +2457,7 @@ end;
      * @param index The index must be between 0 and length() - 1.
      * @return      The truth.
      *)
-function JSONArray.optBoolean(index: integer): boolean;
+function TJSONArray.optBoolean(index: integer): boolean;
 begin
   result := optBoolean(index, false);
 end;
@@ -2365,7 +2471,7 @@ end;
      * @param defaultValue     A boolean default.
      * @return      The truth.
      *)
-function JSONArray.optBoolean(index: integer;
+function TJSONArray.optBoolean(index: integer;
   defaultValue: boolean): boolean;
 var
  o : TZAbstractObject;
@@ -2396,7 +2502,7 @@ end;
  * @param index The index must be between 0 and length() - 1.
  * @return      The value.
  *)
-function JSONArray.optDouble(index: integer): double;
+function TJSONArray.optDouble(index: integer): double;
 begin
    result := optDouble(index, _Double.NaN);
 end;
@@ -2410,7 +2516,7 @@ end;
  * @param defaultValue     The default value.
  * @return      The value.
  *)
-function JSONArray.optDouble(index: integer; defaultValue :double): double;
+function TJSONArray.optDouble(index: integer; defaultValue :double): double;
 var
  o : TZAbstractObject;
  d : _Double;
@@ -2425,7 +2531,7 @@ begin
           d := _Double.create (_String (o));
           result := d.doubleValue ;
           d.Free;
-	  exit;
+	        exit;
       except
         on e:Exception  do begin
           result := defaultValue;
@@ -2443,7 +2549,7 @@ end;
  * @param index The index must be between 0 and length() - 1.
  * @return      The value.
  *)
-function JSONArray.optInt(index: integer): integer;
+function TJSONArray.optInt(index: integer): integer;
 begin
   result := optInt(index, 0);
 end;
@@ -2457,7 +2563,7 @@ end;
  * @param defaultValue     The default value.
  * @return      The value.
  *)
-function JSONArray.optInt(index, defaultValue: integer): integer;
+function TJSONArray.optInt(index, defaultValue: integer): integer;
 var
   o : TZAbstractObject;
 begin
@@ -2479,38 +2585,38 @@ end;
 
 
 (**
- * Get the optional JSONArray associated with an index.
+ * Get the optional TJSONArray associated with an index.
  * @param index subscript
- * @return      A JSONArray value, or null if the index has no value,
- * or if the value is not a JSONArray.
+ * @return      A TJSONArray value, or null if the index has no value,
+ * or if the value is not a TJSONArray.
  *)
-function JSONArray.optJSONArray(index: integer): JSONArray;
+function TJSONArray.optJSONArray(index: integer): TJSONArray;
 var
  o : TZAbstractObject;
 begin
   o := opt(index);
-  if (o is JSONArray) then begin
-    result := JSONArray (o) ;
+  if (o is TJSONArray) then begin
+    result := TJSONArray (o) ;
   end else begin
     result := nil;
   end;
 end;
 
 (**
- * Get the optional JSONObject associated with an index.
+ * Get the optional TJSONObject associated with an index.
  * Null is returned if the key is not found, or null if the index has
- * no value, or if the value is not a JSONObject.
+ * no value, or if the value is not a TJSONObject.
  *
  * @param index The index must be between 0 and length() - 1.
- * @return      A JSONObject value.
+ * @return      A TJSONObject value.
  *)
-function JSONArray.optJSONObject(index: integer): JSONObject;
+function TJSONArray.optJSONObject(index: integer): TJSONObject;
 var
   o : TZAbstractObject;
 begin
   o := opt(index);
-  if (o is JSONObject) then begin
-      result := JSONObject (o);
+  if (o is TJSONObject) then begin
+      result := TJSONObject (o);
   end else begin
       result := nil;
   end;
@@ -2525,7 +2631,7 @@ end;
  * @param index The index must be between 0 and length() - 1.
  * @return      A String value.
  *)
-function JSONArray.optString(index: integer): string;
+function TJSONArray.optString(index: integer): string;
 begin
   result := optString(index, '');
 end;
@@ -2538,7 +2644,7 @@ end;
  * @param defaultValue     The default value.
  * @return      A String value.
  *)
-function JSONArray.optString(index: integer; defaultValue: string): string;
+function TJSONArray.optString(index: integer; defaultValue: string): string;
 var
   o : TZAbstractObject;
 begin
@@ -2558,7 +2664,7 @@ end;
  * @param value A boolean value.
  * @return this.
  *)
-function JSONArray.put(value: boolean): JSONArray;
+function TJSONArray.put(value: boolean): TJSONArray;
 begin
   put(_Boolean.valueOf(value));
   result :=  self;
@@ -2570,7 +2676,7 @@ end;
  * @param value A double value.
  * @return this.
  *)
-function JSONArray.put(value: double): JSONArray;
+function TJSONArray.put(value: double): TJSONArray;
 begin
     put(_Double.create(value));
     result := self;
@@ -2582,14 +2688,14 @@ end;
  * @param value An int value.
  * @return this.
  *)
-function JSONArray.put(value: integer): JSONArray;
+function TJSONArray.put(value: integer): TJSONArray;
 begin
   put(_Integer.create(value));
   result := self;
 end;
 
 
-function JSONArray.put(value: string): JSONArray;
+function TJSONArray.put(value: string): TJSONArray;
 begin
     put (_String.create (value));
     result := self;
@@ -2599,64 +2705,64 @@ end;
 (**
  * Append an object value.
  * @param value An object value.  The value should be a
- *  Boolean, Double, Integer, JSONArray, JSObject, or String, or the
- *  JSONObject.NULL object.
+ *  Boolean, Double, Integer, TJSONArray, JSObject, or String, or the
+ *  TJSONObject.NULL object.
  * @return this.
  *)
-function JSONArray.put(value: TZAbstractObject): JSONArray;
+function TJSONArray.put(value: TZAbstractObject): TJSONArray;
 begin
     myArrayList.add(value);
     result := self;
 end;
 
 (**
- * Put or replace a boolean value in the JSONArray.
+ * Put or replace a boolean value in the TJSONArray.
  * @param index subscript The subscript. If the index is greater than the length of
- *  the JSONArray, then null elements will be added as necessary to pad
+ *  the TJSONArray, then null elements will be added as necessary to pad
  *  it out.
  * @param value A boolean value.
  * @return this.
- * @exception NoSuchElementException The index must not be negative.
+ * @raises (NoSuchElementException The index must not be negative.)
  *)
-function JSONArray.put(index: integer; value: boolean): JSONArray;
+function TJSONArray.put(index: integer; value: boolean): TJSONArray;
 begin
   put(index, _Boolean.valueOf(value));
   result := self;
 end;
 
-function JSONArray.put(index, value: integer): JSONArray;
+function TJSONArray.put(index, value: integer): TJSONArray;
 begin
   put(index, _Integer.create(value));
   result := self;
 end;
 
 
-function JSONArray.put(index: integer; value: double): JSONArray;
+function TJSONArray.put(index: integer; value: double): TJSONArray;
 begin
   put(index, _Double.create(value));
   result := self;
 end;
 
-function JSONArray.put(index: integer; value: string): JSONArray;
+function TJSONArray.put(index: integer; value: string): TJSONArray;
 begin
   put (index,_String.create (value));
   result := self;
 end;
 
 (**
-     * Put or replace an object value in the JSONArray.
+     * Put or replace an object value in the TJSONArray.
      * @param index The subscript. If the index is greater than the length of
-     *  the JSONArray, then null elements will be added as necessary to pad
+     *  the TJSONArray, then null elements will be added as necessary to pad
      *  it out.
      * @param value An object value.
      * @return this.
-     * @exception NoSuchElementException The index must not be negative.
-     * @exception NullPointerException   The index must not be null.
+     * @raises (NoSuchElementException The index must not be negative.)
+     * @raises (NullPointerException   The index must not be null.)
      *)
-function JSONArray.put(index: integer; value: TZAbstractObject): JSONArray;
+function TJSONArray.put(index: integer; value: TZAbstractObject): TJSONArray;
 begin
     if (index < 0) then begin
-        raise NoSuchElementException.create('JSONArray['
+        raise NoSuchElementException.create('TJSONArray['
           + intToStr(index) + '] not found.');
     end else if (value = nil) then begin
         raise NullPointerException.create('');
@@ -2672,22 +2778,22 @@ begin
 end;
 
 (**
- * Produce a JSONObject by combining a JSONArray of names with the values
- * of this JSONArray.
- * @param names A JSONArray containing a list of key strings. These will be
+ * Produce a TJSONObject by combining a TJSONArray of names with the values
+ * of this TJSONArray.
+ * @param names A TJSONArray containing a list of key strings. These will be
  * paired with the values.
- * @return A JSONObject, or null if there are no names or if this JSONArray
+ * @return A TJSONObject, or null if there are no names or if this TJSONArray
  * has no values.
  *)
-function JSONArray.toJSONObject(names :JSONArray): JSONObject;
+function TJSONArray.toJSONObject(names :TJSONArray): TJSONObject;
 var
-  jo : JSONObject ;
+  jo : TJSONObject ;
   i : integer;
 begin
   if ((names = nil) or (names.length() = 0) or (length() = 0)) then begin
       result := nil;
   end;
-  jo := JSONObject.create();
+  jo := TJSONObject.create();
   for i := 0 to names.length() do begin
       jo.put(names.getString(i), self.opt(i));
   end;
@@ -2696,20 +2802,20 @@ end;
 
 
 (**
- * Make an JSON external form string of this JSONArray. For compactness, no
+ * Make an JSON external form string of this TJSONArray. For compactness, no
  * unnecessary whitespace is added.
  * Warning: This method assumes that the data structure is acyclical.
  *
  * @return a printable, displayable, transmittable
  *  representation of the array.
  *)
-function JSONArray.toString: string;
+function TJSONArray.toString: string;
 begin
    result := '[' + join(',') + ']';
 end;
 
 (**
-     * Make a prettyprinted JSON string of this JSONArray.
+     * Make a prettyprinted JSON string of this TJSONArray.
      * Warning: This method assumes that the data structure is non-cyclical.
      * @param indentFactor The number of spaces to add to each level of
      *  indentation.
@@ -2718,13 +2824,23 @@ end;
      *  with <code>[</code>&nbsp;<small>(left bracket)</small> and ending
      *  with <code>]</code>&nbsp;<small>(right bracket)</small>.
      *)
-function JSONArray.toString(indentFactor: integer): string;
+function TJSONArray.toString(indentFactor: integer): string;
 begin
   result := toString(indentFactor, 0);
 end;
 
 (**
-     * Make a prettyprinted string of this JSONArray.
+  * Make a TList of TJSONArray;
+  * @return a TList object
+*)
+function TJSONArray.toList: TList;
+begin
+  result := TList.create ;
+  result.Assign(myArrayList,laCopy);
+end;
+
+(**
+     * Make a prettyprinted string of this TJSONArray.
      * Warning: This method assumes that the data structure is non-cyclical.
      * @param indentFactor The number of spaces to add to each level of
      *  indentation.
@@ -2732,13 +2848,7 @@ end;
      * @return a printable, displayable, transmittable
      *  representation of the array.
      *)
-function JSONArray.toList: TList;
-begin
-  result := TList.create ;
-  result.Assign(myArrayList,laCopy);
-end;
-
-function JSONArray.toString(indentFactor, indent: integer): string;
+function TJSONArray.toString(indentFactor, indent: integer): string;
 var
   len, i,j, newindent : integer;
   sb : string;
@@ -2751,7 +2861,7 @@ begin
     i := 0;
     sb := '[';
     if (len = 1) then begin
-        sb := sb + JSONObject
+        sb := sb + TJSONObject
         .valueToString(TZAbstractObject( myArrayList[0]),indentFactor, indent);
     end else begin
         newindent := indent + indentFactor;
@@ -2763,7 +2873,7 @@ begin
             for j := 0 to newindent-1 do begin
                 sb := sb + ' ';
             end;
-            sb := sb + (JSONObject
+            sb := sb + (TJSONObject
               .valueToString(TZAbstractObject(myArrayList[i]),
                     indentFactor, newindent));
         end;
@@ -2822,28 +2932,25 @@ begin
  result := Format('%s <%p>', [ClassName, addr(Self)]);
 end;
 
-procedure JSONObject.clean;
-var
-  sl : TStringList;
-  i : integer;
-  obj : TObject;
+procedure TJSONObject.clean;
 begin
-    sl := keys;
-    for i := 0 to sl.count -1 do begin
-      obj := remove(sl[i]);
-      if (obj <> nil) then begin
-        FreeAndNil (obj);
+  while myHashMap.Count > 0 do begin
+      if (myHashMap.Objects [0] <> CONST_FALSE)
+        and (myHashMap.Objects [0] <> CONST_TRUE)
+        and (myHashMap.Objects [0] <> CNULL) then begin
+        myHashMap.Objects [0].Free;
       end;
-    end;
-    sl.free;
+      myHashMap.Objects [0] := nil;
+      myHashMap.Delete(0);
+  end;
 end;
 
 
 (**
 * Assign the values to other json Object.
-* @param JSONObject  objeto to assign Values
+* @param TJSONObject  objeto to assign Values
 *)
-procedure JSONObject.assignTo (json : JSONObject) ;
+procedure TJSONObject.assignTo (json : TJSONObject) ;
 var
  _keys : TStringList;
  i : integer;
@@ -2858,11 +2965,11 @@ begin
   end;
 end;
 
-function JSONObject.clone: TZAbstractObject;
+function TJSONObject.clone: TZAbstractObject;
 var
- json : JSONObject;
+ json : TJSONObject;
 begin
-  json := JSONOBject.create (self.toString());
+  json := TJSONObject.create (self.toString());
 end;
 
 
