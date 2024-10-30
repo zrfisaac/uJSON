@@ -6,7 +6,7 @@
 <!-- # . - site : zrfisaac.github.io -->
 
 <!-- # [ markdown ] -->
-# uJSON 1.0.2
+# uJSON 1.0.3
 
 - **Original Author:** Fabio Almeida
 - **Email:** fabiorecife@yahoo.com.br

@@ -177,6 +177,7 @@ Type
     function toString : string; overload; override;
     function toString (indentFactor : integer) : string; overload;
     function toString (indentFactor, indent : integer) : string; overload;
+    function toList () : TList; 
   private
     myArrayList : TList;
   end;
@@ -1475,12 +1476,22 @@ end;
      * @exception NullPointerException The key must be non-null.
      *)
 function JSONObject.put(key: string; value: TZAbstractObject): JSONObject;
+var
+  temp : TObject;
+  i : integer;
 begin
     if (key = '') then begin
             raise NullPointerException.create('Null key.');
     end ;
     if (value <> nil) then begin
+        i := self.myHashMap.IndexOf(key);
+        if ( i >= 0) then begin
+          temp := self.myHashMap.Objects [i];
+          self.myHashMap.Objects[i]  := value;
+          temp.free;
+        end else begin
         self.myHashMap.AddObject(key, value);
+        end;
     end else begin
         remove(key);
     end;
@@ -2681,6 +2692,12 @@ end;
      * @return a printable, displayable, transmittable
      *  representation of the array.
      *)
+function JSONArray.toList: TList;
+begin
+  result := TList.create ;
+  result.Assign(myArrayList,laCopy);
+end;
+
 function JSONArray.toString(indentFactor, indent: integer): string;
 var
   len, i,j, newindent : integer;
