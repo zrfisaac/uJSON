@@ -129,7 +129,7 @@ Type
     function toJSONArray (names : JSONArray) : JSONArray;
     function toString (): string ;  overload; override;  
     function toString (indentFactor : integer): string; overload;
-    function toString (indentFactor, indent : integer): string; overload; 
+    function toString (indentFactor, indent : integer): string; overload;
 
     destructor destroy;override;
     class function NULL : NULL;
@@ -167,16 +167,18 @@ Type
     function put ( value : double ) : JSONArray;   overload ;
     function put ( value : integer) : JSONArray;   overload ;
     function put ( value : TZAbstractObject) : JSONArray;  overload ;
+    function put ( value: string): JSONArray; overload;
     function put ( index : integer ; value : boolean): JSONArray;  overload ;
     function put ( index : integer ; value : double) : JSONArray;  overload ;
     function put ( index : integer ; value : integer) : JSONArray;  overload ;
     function put ( index : integer ; value : TZAbstractObject) : JSONArray;  overload ;
+    function put ( index: integer; value: string): JSONArray; overload;
     function toJSONObject (names  :JSONArray ) : JSONObject ;  overload ;
     function toString : string; overload; override;
     function toString (indentFactor : integer) : string; overload;
-    function toString (indentFactor, indent : integer) : string; overload; 
+    function toString (indentFactor, indent : integer) : string; overload;
   private
-    myArrayList : TList; 
+    myArrayList : TList;
   end;
 
 
@@ -1102,7 +1104,7 @@ end;
 *)
 function JSONObject.getString(key: string): string;
 begin
-  result := get(key).ToString();
+  result := get(key).toString();
 end;
 
 
@@ -1239,10 +1241,12 @@ begin
                     ((o is _String) and
                     (_String(o).equalsIgnoreCase('false')))) then begin
                 result := false;
+                exit;
             end else if (o.equals(_Boolean._TRUE) or
                     ((o is _String) and
                     (_String(o).equalsIgnoreCase('true')))) then begin
                 result := true;
+                exit;
             end;
         end;
         result := defaultValue;
@@ -2209,6 +2213,7 @@ begin
   o := get(index);
   if (o is JSONObject) then begin
       result := JSONObject(o);
+      exit;
   end;
   raise NoSuchElementException.create('JSONArray[' + intToStr(index) +
       '] is not a JSONObject.');
@@ -2320,10 +2325,12 @@ begin
               ((o is _String) and
               (_String(o)).equalsIgnoreCase('false')))) then begin
           result := false;
+          exit;
       end else if ((o.equals(_Boolean._TRUE) or
               ((o is _String) and
               (_String(o)).equalsIgnoreCase('true')))) then begin
           result := true;
+          exit;
       end;
   end;
   result := defaultValue;
@@ -2410,6 +2417,7 @@ begin
       end;
       try
         result := _Integer.parseInt(_String(o));
+        exit;
       except on e: exception do begin
         result := defaultValue;
       end;
@@ -2529,6 +2537,14 @@ begin
   result := self;
 end;
 
+
+function JSONArray.put(value: string): JSONArray;
+begin
+    put (_String.create (value));
+    result := self;
+end;
+
+
 (**
  * Append an object value.
  * @param value An object value.  The value should be a
@@ -2567,6 +2583,12 @@ end;
 function JSONArray.put(index: integer; value: double): JSONArray;
 begin
   put(index, _Double.create(value));
+  result := self;
+end;
+
+function JSONArray.put(index: integer; value: string): JSONArray;
+begin
+  put (index,_String.create (value));
   result := self;
 end;
 
