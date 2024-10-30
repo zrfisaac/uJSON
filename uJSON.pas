@@ -445,6 +445,8 @@ begin
   result := f;
   result.DecimalSeparator := '.';
   result.ThousandSeparator := ',';
+  result.CurrencyDecimals := 2;
+
 end;
 
 
@@ -656,9 +658,8 @@ begin
             '\': begin
                 c := next();
                 case (c) of
-                {'b': // é o backspace = #8
-                    sb.append('\b');
-                    break;}
+                'b': 
+                    sb := sb + #8;
                 't':
                     sb := sb + #9;
                 'n':
@@ -1017,7 +1018,11 @@ begin
       end
       else begin
           x.back();
-          key := x.nextValue().toString();
+          with x.nextValue() do
+          begin
+            key := toString();
+            Free; //Fix memory leak. By creation_zy
+          end;
       end
       end; //fim do case
 
@@ -1330,11 +1335,10 @@ class function TJSONObject.numberToString(n: _Number): string;
 begin
    if (n = nil) then begin
      result := '';
-   end else if (n is _Integer) then begin
-     result := IntToStr(n.intValue)
-   end else begin
-     result := FloatToStr (n.doubleValue, getFormatSettings());
-   end; 
+   end
+   else begin
+     result :=  n.toString();
+   end;
 end;
 
 
@@ -1672,6 +1676,9 @@ var
    b,c : char;
    i, len : integer;
    sb, t : string;
+const
+  NoConversion = ['A'..'Z','a'..'z','*','@','.','_','-',
+                  '0'..'9','$','!','''','(',')'];
 begin
         if ((s = '') or (System.Length(s) = 0)) then begin
             result :=  '""';
@@ -1699,11 +1706,23 @@ begin
                 end;
                 sb := sb + c;
             end;
-            #8, #9, #10, #12, #13:  begin
-                sb := sb + c;
+            #8:  begin
+                sb := sb + '\b';
+            end;
+            #9:  begin
+                sb := sb + '\t';
+            end;
+            #10:  begin
+                sb := sb + '\n';
+            end;
+            #12:  begin
+                sb := sb + '\f';
+            end;
+            #13:  begin
+                sb := sb + '\r';
             end;
             else begin
-                if (c < ' ') then begin
+                if (not (c in NoConversion)) then begin
                     t := '000' + _Integer.toHexString(c);
                     sb := sb + '\u' + copy (t,System.length(t)-3,4);
                 end else begin
@@ -1776,19 +1795,19 @@ var
 begin
       _keys := keys();
       try
-      sb := '{';
+          sb := '{';
 
-      for i := 0 to _keys.count -1 do begin
-          if (System.length(sb) > 1) then begin
-              sb:= sb + ',';
+          for i := 0 to _keys.count -1 do begin
+              if (System.length(sb) > 1) then begin
+                  sb:= sb + ',';
+              end;
+              o := _keys[i];
+              sb := sb + quote(o);
+              sb := sb + ':';
+              sb:= sb + valueToString(TZAbstractObject(myHashMap.Objects[myHashMap.IndexOf(o)]));
           end;
-          o := _keys[i];
-          sb := sb + quote(o);
-          sb := sb + ':';
-          sb:= sb + valueToString(TZAbstractObject(myHashMap.Objects[myHashMap.IndexOf(o)]));
-      end;
-      sb := sb + '}';
-      result := sb;
+          sb := sb + '}';
+          result := sb;
       finally
         _keys.free;
       end;
@@ -1836,41 +1855,45 @@ begin
             exit;
         end;
         _keys := keys();
-        sb := sb + '{';
-        newindent := indent + indentFactor;
-        if (n = 1) then begin
-            o := _keys[0];
-            sb:= sb + quote(o);
-            sb:= sb + ': ';
-            sb:= sb + valueToString(TZAbstractObject(myHashMap
-            .Objects[myHashMap.IndexOf(o)])
-            , indentFactor, indent);
-        end else begin
-            for j := 0 to _keys.count -1 do begin
-                o := _keys[j];
-                if (System.length(sb) > 1) then begin
-                    sb := sb + ','+ #10;
-                end else begin
-                    sb:= sb + #10;
-                end;
-                for i := 0 to newindent -1  do begin
-                    sb:= sb + ' ';
-                end;
+        try
+            sb := sb + '{';
+            newindent := indent + indentFactor;
+            if (n = 1) then begin
+                o := _keys[0];
                 sb:= sb + quote(o);
                 sb:= sb + ': ';
                 sb:= sb + valueToString(TZAbstractObject(myHashMap
                 .Objects[myHashMap.IndexOf(o)])
-                , indentFactor, newindent);
-            end;
-            if (System.length(sb) > 1) then begin
-                sb := sb + #10;
-                for i := 0 to indent -1 do begin
-                    sb:= sb + ' ';
+                , indentFactor, indent);
+            end else begin
+                for j := 0 to _keys.count -1 do begin
+                    o := _keys[j];
+                    if (System.length(sb) > 1) then begin
+                        sb := sb + ','+ #10;
+                    end else begin
+                        sb:= sb + #10;
+                    end;
+                    for i := 0 to newindent -1  do begin
+                        sb:= sb + ' ';
+                    end;
+                    sb:= sb + quote(o);
+                    sb:= sb + ': ';
+                    sb:= sb + valueToString(TZAbstractObject(myHashMap
+                    .Objects[myHashMap.IndexOf(o)])
+                    , indentFactor, newindent);
+                end;
+                if (System.length(sb) > 1) then begin
+                    sb := sb + #10;
+                    for i := 0 to indent -1 do begin
+                        sb:= sb + ' ';
+                    end;
                 end;
             end;
+            sb:= sb + '}';
+            result :=  sb;
+        finally
+            _keys.Free; 
         end;
-        sb:= sb + '}';
-        result :=  sb;
 end;
 
 class function TJSONObject.NULL: NULL;
@@ -2047,6 +2070,7 @@ end;
 
 class function _Integer.parseInt(s: string; i: integer): integer;
 begin
+
   case i of
   10: begin
     result := strToInt (s);
@@ -2055,7 +2079,11 @@ begin
    result := hexToInt (s);
   end;
   8: begin
-      newNotImplmentedFeature () ;
+       if (s = '0') then begin
+         result := 0
+       end else begin
+        newNotImplmentedFeature () ;
+       end; 
   end;
   end;
 end;
@@ -2116,9 +2144,10 @@ begin
   result := 3.6e-4951;
 end;
 
+
 function _Double.toString: string;
 begin
-  result := floatToStr (fvalue, getFormatSettings);
+  result := '"'+StringReplace(formatFloat('######0.00',fvalue),',','.',[rfReplaceAll])+'"';
 end;
 
 { TJSONArray }
@@ -2571,12 +2600,14 @@ begin
   if (o <> nil) then begin
       if (o is _Number) then begin
           result :=  (_Number(o)).intValue();
+          exit;
       end;
       try
         result := _Integer.parseInt(_String(o));
         exit;
       except on e: exception do begin
         result := defaultValue;
+        exit;
       end;
       end;
   end;
@@ -2970,6 +3001,7 @@ var
  json : TJSONObject;
 begin
   json := TJSONObject.create (self.toString());
+  result := json;
 end;
 
 
