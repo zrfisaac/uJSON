@@ -28,11 +28,11 @@ uses
 
 Type
     TZAbstractObject = class
-      function Equals(const Value: TZAbstractObject): Boolean; virtual;
-      function Hash: LongInt;
+      function equals(const Value: TZAbstractObject): Boolean; virtual;
+      function hash: LongInt;
       function Clone: TZAbstractObject; virtual;
-      function ToString: string; virtual;
-      function InstanceOf(const Value: TZAbstractObject): Boolean;
+      function toString: string; virtual;
+      function instanceOf(const Value: TZAbstractObject): Boolean;
     end;
     
     ClassCastException = class (Exception) end;
@@ -85,6 +85,8 @@ Type
     constructor create (map : TStringList); overload;
     constructor create (s : string); overload;
 
+    procedure clean;
+    function clone : TZAbstractObject; override;
     function accumulate (key : string; value : TZAbstractObject): JSONObject;
     function get (key : string) : TZAbstractObject;
     function getBoolean (key : string): boolean;
@@ -125,9 +127,10 @@ Type
     function putOpt (key : string; value : TZAbstractObject): JSONObject;
     class function quote (s : string): string;
     function remove (key : string): TZAbstractObject;
+    procedure assignTo(json: JSONObject);
 
     function toJSONArray (names : JSONArray) : JSONArray;
-    function toString (): string ;  overload; override;  
+    function toString (): string ;  overload; override;
     function toString (indentFactor : integer): string; overload;
     function toString (indentFactor, indent : integer): string; overload;
 
@@ -177,7 +180,7 @@ Type
     function toString : string; overload; override;
     function toString (indentFactor : integer) : string; overload;
     function toString (indentFactor, indent : integer) : string; overload;
-    function toList () : TList; 
+    function toList () : TList;
   private
     myArrayList : TList;
   end;
@@ -194,6 +197,7 @@ Type
     class function valueOf (b : boolean) : _Boolean;
     constructor create (b : boolean);
     function toString () : string; override;
+    function clone :TZAbstractObject;  override;
   private
     fvalue : boolean;
   end;
@@ -205,7 +209,8 @@ Type
      function doubleValue : double; override;
      function intValue : integer;  override;
      function toString () : string ; override;
-     class function NaN : double;  
+     class function NaN : double;
+     function clone :TZAbstractObject; override;
   private
     fvalue : double;
   end;
@@ -220,6 +225,7 @@ Type
     function doubleValue : double; override;
     function intValue : integer;  override;
     function toString () : string; override;
+     function clone :TZAbstractObject; override;
   private
     fvalue : integer;
   end;
@@ -229,6 +235,7 @@ Type
    function equalsIgnoreCase (s: string) : boolean;
    function Equals(const Value: TZAbstractObject): Boolean; override; 
    function toString() : string; override;
+   function clone :TZAbstractObject; override;
   private
      fvalue : string;
   end;
@@ -808,8 +815,8 @@ end;
 
 
 (**
-     * Construct an empty JSONObject.
-     *)
+* Construct an empty JSONObject.
+*)
 constructor JSONObject.create;
 begin
   myHashMap := TStringList.create;
@@ -828,8 +835,8 @@ var
  i : integer;
 begin
   create();
-  for i :=0 to high(sa)-1  do begin
-            putOpt(sa[i], jo.opt(sa[i]));
+  for i :=low(sa) to high(sa)  do begin
+            putOpt(sa[i], jo.opt(sa[i]).Clone);
   end;
 end;
 
@@ -906,9 +913,13 @@ end;
      *  the JSONObject.
      *)
 constructor JSONObject.create(map: TStringList);
+var
+ i : integer;
 begin
   self.myHashMap := TStringlist.create;
-  self.myHashMap.Text := map.Text;
+  for i := 0 to map.Count -1 do begin
+    self.myHashMap.AddObject(map[i],map.Objects[i]);
+  end;
 end;
 
 (**
@@ -954,7 +965,7 @@ begin
       a.put(value);
   end else  begin
       a := JSONArray.create;
-      a.put(o);
+      a.put(o.clone);
       a.put(value);
       put(key, a);
   end;
@@ -1493,7 +1504,10 @@ begin
         self.myHashMap.AddObject(key, value);
         end;
     end else begin
-        remove(key);
+        temp := remove(key);
+        if (temp <> nil) then  begin
+          temp.free;
+        end;
     end;
     result := self;
 end;
@@ -1809,6 +1823,11 @@ end;
 
 { _Boolean }
 
+function _Boolean.clone: TZAbstractObject;
+begin
+  result := _Boolean.create(Self.fvalue);
+end;
+
 constructor _Boolean.create(b: boolean);
 begin
    fvalue := b;
@@ -1848,6 +1867,11 @@ end;
 
 { _String }
 
+function _String.clone: TZAbstractObject;
+begin
+  result := _String.create (self.fvalue);
+end;
+
 constructor _String.create(s: string);
 begin
   fvalue := s;
@@ -1881,6 +1905,11 @@ end;
 constructor _Integer.create(i: integer);
 begin
   fvalue := i;
+end;
+
+function _Integer.clone: TZAbstractObject;
+begin
+  result := _Integer.create (self.fvalue);
 end;
 
 constructor _Integer.create(s: string);
@@ -1945,6 +1974,11 @@ begin
   create (s.toString);
 end;
 
+
+function _Double.clone: TZAbstractObject;
+begin
+  result := _Double.create (Self.fvalue);
+end;
 
 constructor _Double.create(d: double);
 begin
@@ -2220,14 +2254,20 @@ end;
 function JSONArray.getJSONObject(index: integer): JSONObject;
 var
   o : TZAbstractObject;
+  s : string;
 begin
   o := get(index);
   if (o is JSONObject) then begin
       result := JSONObject(o);
-      exit;
+  end else begin
+      if o <> nil then begin
+        s := o.ClassName;
+      end else begin
+        s := 'nil';
+      end;
+      raise NoSuchElementException.create('JSONArray[' + intToStr(index) +
+        '] is not a JSONObject is ' + s);
   end;
-  raise NoSuchElementException.create('JSONArray[' + intToStr(index) +
-      '] is not a JSONObject.');
 end;
 
 (**
@@ -2782,6 +2822,51 @@ begin
  result := Format('%s <%p>', [ClassName, addr(Self)]);
 end;
 
+procedure JSONObject.clean;
+var
+  sl : TStringList;
+  i : integer;
+  obj : TObject;
+begin
+    sl := keys;
+    for i := 0 to sl.count -1 do begin
+      obj := remove(sl[i]);
+      if (obj <> nil) then begin
+        FreeAndNil (obj);
+      end;
+    end;
+    sl.free;
+end;
+
+
+(**
+* Assign the values to other json Object.
+* @param JSONObject  objeto to assign Values
+*)
+procedure JSONObject.assignTo (json : JSONObject) ;
+var
+ _keys : TStringList;
+ i : integer;
+begin
+  _keys := keys;
+  try
+    for i := 0 to _keys.Count -1 do begin
+      json.put (_keys[i],get(_keys[i]).clone);
+    end;
+  finally
+   _keys.free;
+  end;
+end;
+
+function JSONObject.clone: TZAbstractObject;
+var
+ json : JSONObject;
+begin
+  json := JSONOBject.create (self.toString());
+end;
+
+
+{ _Number }
 
 
 initialization
