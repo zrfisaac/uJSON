@@ -1,5 +1,6 @@
 {
   Copyright (C) 2005 Fabio Almeida
+  fabiorecife@yahoo.com.br
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -17,11 +18,6 @@
 
   Autor : Jose Fabio Nascimento de Almeida
   Data : 7/11/2005
-  email: fabiorecife@yahoo.com.br
-
-  obs.:this code is based in java code from www.json.org
-
-  The code compile fine with Delphi 7.0 . I don't try compile with FreePascalCompiler.
 
 }
 unit uJSON;
@@ -247,7 +243,7 @@ var
 implementation
 
 const
-  CROTINA_NAO_IMPLEMENTADA :string = 'Rotina Nï¿½ Implementada';
+  CROTINA_NAO_IMPLEMENTADA :string = 'Rotina Não Implementada';
 
 procedure newNotImplmentedFeature () ;
 begin
@@ -490,7 +486,7 @@ begin
             '\': begin
                 c := next();
                 case (c) of
-                {'b': // ï¿½o backspace = #8
+                {'b': // é o backspace = #8
                     sb.append('\b');
                     break;}
                 't':
@@ -752,7 +748,7 @@ end;
      *)
 function JSONTokener.syntaxError(_message: string): ParseException;
 begin
- result := ParseException.create (_message + toString()+' prï¿½imo a : '
+ result := ParseException.create (_message + toString()+' próximo a : '
  + copy (toString(),self.myIndex,10), self.myIndex);
 end;
 
@@ -1775,6 +1771,7 @@ class function JSONObject.valueToString(value: TZAbstractObject;
 begin
    if ((value = nil) or (value.equals(nil))) then begin
         result := 'null';
+        exit;
     end;
     if (value is _Number) then begin
         result := numberToString(_Number(value));
@@ -1790,6 +1787,7 @@ begin
     end;
     if (value is JSONArray) then begin
         result := ((JSONArray(value)).toString(indentFactor, indent));
+        exit;
     end;
     result := quote(value.toString());
 end;
@@ -2067,6 +2065,7 @@ begin
     end;
     myArrayList.Delete(0);
   end;
+  myArrayList.Free;
   inherited;
 end;
 
@@ -2143,6 +2142,7 @@ begin
       d :=  _Double.create(_String(o));
       try
        result := d.doubleValue();
+       exit;
       finally
        d.Free;
       end; 
@@ -2367,6 +2367,7 @@ begin
           d := _Double.create (_String (o));
           result := d.doubleValue ;
           d.Free;
+	  exit;
       except
         on e:Exception  do begin
           result := defaultValue;
@@ -2589,7 +2590,7 @@ begin
     end else if (index < length()) then begin
         myArrayList[index] := value;
     end else begin
-        while (index >= length()) do begin
+        while (index <> length()) do begin
             put(nil);
         end;
         put(value);
